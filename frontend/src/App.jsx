@@ -13,33 +13,29 @@ export default function App() {
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
   const gerarReceita = async () => {
-    if (!titulo.trim()) {
-      alert("Digite um título");
-      return;
-    }
+  if (!titulo.trim()) return alert("Digite um título");
 
-    const listaDoencas = Object.entries(doencas)
-      .filter(([_, val]) => val)
-      .map(([key]) => key);
+  setLoading(true);
+  try {
+    const response = await fetch(`${API_URL}/gerar-receita`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        titulo, 
+        doencas: Object.keys(doencas).filter(d => doencas[d]) // envia apenas as marcadas
+      }),
+    });
 
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/gerar-receita`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ titulo, doencas: listaDoencas }),
-      });
+    if (!response.ok) throw new Error("Erro no backend");
 
-      if (!response.ok) throw new Error("Erro no backend");
-
-      const data = await response.json();
-      setReceita(data);
-    } catch (e) {
-      alert("Erro ao gerar receita");
-    } finally {
-      setLoading(false);
-    }
-  };
+    const data = await response.json();
+    setReceita(data);
+  } catch (e) {
+    alert("Erro ao gerar receita");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <>

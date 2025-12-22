@@ -25,13 +25,18 @@ class ReceitaRequest(BaseModel):
     titulo: str
     doencas: list[str] = []
 
-# Função para gerar receita via Gemini
 def gerar_receita_gemini(titulo: str, doencas: list[str]):
-    restricoes = ", ".join(doencas) if doencas else "nenhuma"
+    restricoes = ""
+    if "diabetes" in doencas:
+        restricoes += "- Não use açúcar refinado nem ingredientes que aumentem rapidamente a glicose.\n"
+    if "hipertensao" in doencas:
+        restricoes += "- Reduza sal e evite alimentos processados ricos em sódio.\n"
+    if "colesterol" in doencas:
+        restricoes += "- Evite gorduras saturadas, frituras e ovos em excesso.\n"
+
     prompt = f"""
 Crie uma receita adequada para pessoas com Alzheimer.
-
-Evite ingredientes que pessoas com as seguintes condições não podem consumir: {restricoes}.
+{restricoes}
 
 Responda APENAS com um JSON válido no seguinte formato:
 
@@ -58,15 +63,16 @@ Título da receita: "{titulo}"
     model = genai.GenerativeModel("gemini-2.5-flash")
     response = model.generate_content(prompt)
     texto = response.text.strip()
-    logging.info(f"Texto bruto do Gemini: {texto}")
 
+    # Extrai JSON válido
+    import re
+    import json
     match = re.search(r"\{.*\}", texto, re.DOTALL)
     if not match:
         raise ValueError("Não foi possível extrair JSON válido do modelo")
     
-    receita = json.loads(match.group(0))
-    logging.info(f"Receita JSON extraída: {receita}")
-    return receita
+    return json.loads(match.group(0))
+
 
 @app.post("/gerar-receita")
 async def gerar_receita(dados: ReceitaRequest):
@@ -74,7 +80,8 @@ async def gerar_receita(dados: ReceitaRequest):
         receita = gerar_receita_gemini(dados.titulo, dados.doencas)
         return receita
     except Exception as e:
-        logging.error(f"Erro ao gerar receita com Gemini: {e}")
+        import logging
+        logging.error(f"Erro ao gerar receita: {e}")
         # fallback
         return {
             "nome": f"Receita de {dados.titulo}",
@@ -88,3 +95,4 @@ async def gerar_receita(dados: ReceitaRequest):
             "modoPreparo": ["Passo 1", "Passo 2"],
             "beneficios": ["Melhora memória", "Fortalece o cérebro"]
         }
+
