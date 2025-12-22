@@ -27,16 +27,26 @@ class ReceitaRequest(BaseModel):
 
 def gerar_receita_gemini(titulo: str, doencas: list[str]):
     restricoes = ""
+    substituicoes = ""
+
     if "diabetes" in doencas:
-        restricoes += "- Substitua açúcar refinado por adoçante culinário apropriado.\n"
+        restricoes += "- Não use açúcar refinado nem ingredientes que aumentem rapidamente a glicose.\n"
+        substituicoes += "- Substitua açúcar por adoçantes naturais como stevia ou eritritol.\n"
+
     if "hipertensao" in doencas:
         restricoes += "- Reduza sal e evite alimentos processados ricos em sódio.\n"
+        substituicoes += "- Substitua sal comum por ervas, especiarias ou sal com baixo sódio.\n"
+
     if "colesterol" in doencas:
         restricoes += "- Evite gorduras saturadas, frituras e ovos em excesso.\n"
+        substituicoes += "- Substitua manteiga e gorduras saturadas por azeite ou óleo vegetal.\n"
 
     prompt = f"""
 Crie uma receita adequada para pessoas com Alzheimer.
+
+Siga estas regras:
 {restricoes}
+{substituicoes}
 
 Responda APENAS com um JSON válido no seguinte formato:
 
@@ -65,14 +75,11 @@ Título da receita: "{titulo}"
     texto = response.text.strip()
 
     # Extrai JSON válido
-    import re
-    import json
     match = re.search(r"\{.*\}", texto, re.DOTALL)
     if not match:
         raise ValueError("Não foi possível extrair JSON válido do modelo")
     
     return json.loads(match.group(0))
-
 
 @app.post("/gerar-receita")
 async def gerar_receita(dados: ReceitaRequest):
