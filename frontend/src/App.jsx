@@ -5,6 +5,7 @@ export default function App() {
   const [titulo, setTitulo] = useState("");
   const [receita, setReceita] = useState(null);
   const [loading, setLoading] = useState(false);
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
   const gerarReceita = async () => {
     if (!titulo.trim()) {
@@ -14,7 +15,7 @@ export default function App() {
 
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/gerar-receita", {
+      const response = await fetch(`${API_URL}/gerar-receita`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ titulo }),
