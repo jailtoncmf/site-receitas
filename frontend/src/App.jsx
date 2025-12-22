@@ -4,38 +4,57 @@ import { Brain, ChefHat, Plus, Trash2 } from "lucide-react";
 export default function App() {
   const [titulo, setTitulo] = useState("");
   const [doencas, setDoencas] = useState({
-    Diabetes: false,
-    Hipertensao: false,
-    Colesterol: false,
+    diabetes: false,
+    hipertensao: false,
+    colesterol: false,
   });
   const [receita, setReceita] = useState(null);
   const [loading, setLoading] = useState(false);
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+  const toggleDoenca = (doenca) => {
+    setDoencas({ ...doencas, [doenca]: !doencas[doenca] });
+  };
+
   const gerarReceita = async () => {
-  if (!titulo.trim()) return alert("Digite um título");
+    if (!titulo.trim()) return alert("Digite um título");
 
-  setLoading(true);
-  try {
-    const response = await fetch(`${API_URL}/gerar-receita`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        titulo, 
-        doencas: Object.keys(doencas).filter(d => doencas[d]) // envia apenas as marcadas
-      }),
-    });
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/gerar-receita`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          titulo,
+          doencas: Object.keys(doencas).filter((d) => doencas[d]),
+        }),
+      });
 
-    if (!response.ok) throw new Error("Erro no backend");
+      if (!response.ok) throw new Error("Erro no backend");
 
-    const data = await response.json();
-    setReceita(data);
-  } catch (e) {
-    alert("Erro ao gerar receita");
-  } finally {
-    setLoading(false);
-  }
-};
+      const data = await response.json();
+      setReceita(data);
+    } catch (e) {
+      alert("Erro ao gerar receita");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatIngrediente = (ingrediente) => {
+    const match = ingrediente.item.match(/\(substituindo (.+)\)/i);
+    if (match) {
+      return (
+        <>
+          {ingrediente.item.replace(match[0], "")}{" "}
+          <span style={{ fontStyle: "italic", color: "#d97706" }}>
+            (substituindo {match[1]})
+          </span>
+        </>
+      );
+    }
+    return ingrediente.item;
+  };
 
   return (
     <>
@@ -66,7 +85,9 @@ export default function App() {
         </div>
 
         <h1>Gerador de Receitas</h1>
-        <p className="subtitle">Escreva a Receita que você quer ou Ingredientes que Você tem para Receber uma Receita</p>
+        <p className="subtitle">
+          Escreva a Receita que você quer ou Ingredientes que Você tem para Receber uma Receita
+        </p>
 
         <div className="card">
           <input
@@ -77,21 +98,23 @@ export default function App() {
             onKeyDown={(e) => e.key === "Enter" && gerarReceita()}
           />
 
-      <div className="doencas-container" style={{ display: "flex", alignItems: "center", gap: "20px", marginTop: "12px" }}>
-       <p style={{ margin: 0, fontWeight: "bold" }}>Você possui alguma dessas doenças?</p>
-       <div className="doencas" style={{ display: "flex", gap: "12px" }}>
-        <label>
-         <input type="checkbox" checked={doencas.diabetes} onChange={() => toggleDoenca("diabetes")} /> Diabetes
-        </label>
-        <label>
-         <input type="checkbox" checked={doencas.hipertensao} onChange={() => toggleDoenca("hipertensao")} /> Hipertensão
-          </label>
-        <label>
-          <input type="checkbox" checked={doencas.colesterol} onChange={() => toggleDoenca("colesterol")} /> Colesterol Alto
-        </label>
-       </div>
-      </div>
-
+          <div
+            className="doencas-container"
+            style={{ display: "flex", alignItems: "center", gap: "20px", marginTop: "12px" }}
+          >
+            <p style={{ margin: 0, fontWeight: "bold" }}>Você possui alguma dessas doenças?</p>
+            <div className="doencas" style={{ display: "flex", gap: "12px" }}>
+              <label>
+                <input type="checkbox" checked={doencas.diabetes} onChange={() => toggleDoenca("diabetes")} /> Diabetes
+              </label>
+              <label>
+                <input type="checkbox" checked={doencas.hipertensao} onChange={() => toggleDoenca("hipertensao")} /> Hipertensão
+              </label>
+              <label>
+                <input type="checkbox" checked={doencas.colesterol} onChange={() => toggleDoenca("colesterol")} /> Colesterol Alto
+              </label>
+            </div>
+          </div>
 
           <button onClick={gerarReceita} disabled={loading}>
             {loading ? "Gerando..." : "Gerar Receita"} <Plus size={16} />
@@ -117,7 +140,7 @@ export default function App() {
             <ul>
               {receita.ingredientes.map((i, idx) => (
                 <li key={idx}>
-                  <strong>{i.quantidade}</strong> de {i.item}
+                  <strong>{i.quantidade}</strong> de {formatIngrediente(i)}
                 </li>
               ))}
             </ul>
