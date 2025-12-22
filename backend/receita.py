@@ -28,7 +28,7 @@ class ReceitaRequest(BaseModel):
 def gerar_receita_gemini(titulo: str, doencas: list[str]):
     restricoes = ""
     if "diabetes" in doencas:
-        restricoes += "- Não use açúcar refinado nem ingredientes que aumentem rapidamente a glicose.\n"
+        restricoes += "- Substitua açúcar refinado por adoçante culinário apropriado.\n"
     if "hipertensao" in doencas:
         restricoes += "- Reduza sal e evite alimentos processados ricos em sódio.\n"
     if "colesterol" in doencas:
