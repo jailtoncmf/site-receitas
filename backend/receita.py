@@ -8,7 +8,6 @@ from pydantic import BaseModel
 import google.generativeai as genai
 
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI()
@@ -20,18 +19,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Modelo de entrada atualizado
+# Modelo de entrada
 class ReceitaRequest(BaseModel):
     titulo: str
-    doencas: list[str] = []
+    doencas: dict  # { "diabetes": true, "hipertensao": false, "colesterol": true }
 
 # Função para gerar receita via Gemini
-def gerar_receita_gemini(titulo: str, doencas: list[str]):
-    restricoes = ", ".join(doencas) if doencas else "nenhuma"
+def gerar_receita_gemini(titulo: str, doencas: dict):
+    # Mapeamento básico de ingredientes proibidos
+    proibidos = []
+    if doencas.get("diabetes"):
+        proibidos += ["açúcar", "mel", "calda de chocolate", "refrigerante"]
+    if doencas.get("hipertensao"):
+        proibidos += ["sal", "embutidos", "molho pronto", "enlatados"]
+    if doencas.get("colesterol"):
+        proibidos += ["manteiga", "creme de leite", "frituras", "gema de ovo"]
+
+    proibir_texto = ""
+    if proibidos:
+        proibir_texto = "NÃO use os seguintes ingredientes: " + ", ".join(proibidos) + "."
+
     prompt = f"""
 Crie uma receita adequada para pessoas com Alzheimer.
-
-Evite ingredientes que pessoas com as seguintes condições não podem consumir: {restricoes}.
+{proibir_texto}
 
 Responda APENAS com um JSON válido no seguinte formato:
 
@@ -55,11 +65,13 @@ Responda APENAS com um JSON válido no seguinte formato:
 
 Título da receita: "{titulo}"
 """
+
     model = genai.GenerativeModel("gemini-2.5-flash")
     response = model.generate_content(prompt)
     texto = response.text.strip()
     logging.info(f"Texto bruto do Gemini: {texto}")
 
+    # Extrair JSON
     match = re.search(r"\{.*\}", texto, re.DOTALL)
     if not match:
         raise ValueError("Não foi possível extrair JSON válido do modelo")
@@ -68,6 +80,7 @@ Título da receita: "{titulo}"
     logging.info(f"Receita JSON extraída: {receita}")
     return receita
 
+# Endpoint real usando Gemini
 @app.post("/gerar-receita")
 async def gerar_receita(dados: ReceitaRequest):
     try:
@@ -75,7 +88,7 @@ async def gerar_receita(dados: ReceitaRequest):
         return receita
     except Exception as e:
         logging.error(f"Erro ao gerar receita com Gemini: {e}")
-        # fallback
+        # fallback simples
         return {
             "nome": f"Receita de {dados.titulo}",
             "descricao": "Receita nutritiva para Alzheimer",
