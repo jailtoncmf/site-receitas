@@ -1,17 +1,20 @@
-# receita.py
 import os
+import json
+import re
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import google.generativeai as genai
-import json
 
-# Configura Gemini
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+logging.basicConfig(level=logging.INFO)
+
 
 app = FastAPI()
 
-# CORS para React
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,11 +22,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Modelo de entrada
+
 class ReceitaRequest(BaseModel):
     titulo: str
 
-# Função para gerar receita via Gemini
+
 def gerar_receita_gemini(titulo: str):
     prompt = f"""
 Crie uma receita adequada para pessoas com Alzheimer.
@@ -50,22 +53,30 @@ Responda APENAS com um JSON válido no seguinte formato:
 
 Título da receita: "{titulo}"
 """
+
     model = genai.GenerativeModel("gemini-2.5-flash")
     response = model.generate_content(prompt)
     texto = response.text.strip()
+    logging.info(f"Texto bruto do Gemini: {texto}")
 
-    # Garantia de JSON válido
-    receita = json.loads(texto)
+
+    match = re.search(r"\{.*\}", texto, re.DOTALL)
+    if not match:
+        raise ValueError("Não foi possível extrair JSON válido do modelo")
+    
+    receita = json.loads(match.group(0))
+    logging.info(f"Receita JSON extraída: {receita}")
     return receita
 
-# Endpoint real usando Gemini
+
 @app.post("/gerar-receita")
 async def gerar_receita(dados: ReceitaRequest):
     try:
         receita = gerar_receita_gemini(dados.titulo)
         return receita
     except Exception as e:
-        # fallback em caso de erro (ex: limite da API)
+        logging.error(f"Erro ao gerar receita com Gemini: {e}")
+
         return {
             "nome": f"Receita de {dados.titulo}",
             "descricao": "Receita nutritiva para Alzheimer",
