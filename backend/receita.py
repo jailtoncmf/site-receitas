@@ -34,7 +34,52 @@ PROIBIDOS = {
     "colesterol": ["manteiga", "creme de leite", "queijo amarelo", "gordura animal", "frituras", "ovos em excesso"]
 }
 
-# Função principal que gera a receita via Gemini
+# Substitutos saudáveis para ingredientes proibidos
+SUBSTITUTOS = {
+    "açúcar": "adoçante natural (eritritol ou xilitol)",
+    "açúcar refinado": "adoçante natural (eritritol ou xilitol)",
+    "açúcar demerara": "adoçante natural (eritritol ou xilitol)",
+    "açúcar mascavo": "adoçante natural (eritritol ou xilitol)",
+    "mel": "adoçante natural (eritritol ou xilitol)",
+    "xarope de milho": "adoçante natural (eritritol ou xilitol)",
+    "chocolate ao leite": "chocolate 70% cacau ou cacau puro",
+    "refrigerante": "suco natural sem açúcar",
+    "bolo industrializado": "bolo caseiro com ingredientes naturais",
+    "sal": "sal light ou temperos naturais",
+    "salsicha": "frango ou peru cozido",
+    "presunto": "frango ou peru cozido",
+    "queijo processado": "queijo branco ou ricota",
+    "molho pronto": "molho caseiro sem sal",
+    "conservas": "vegetais frescos",
+    "manteiga": "azeite de oliva ou óleo vegetal",
+    "creme de leite": "iogurte natural",
+    "queijo amarelo": "queijo branco ou ricota",
+    "gordura animal": "azeite de oliva",
+    "frituras": "assado ou cozido",
+    "ovos em excesso": "1 ovo por receita ou claras"
+}
+
+# Função para substituir ingredientes proibidos
+def filtrar_ingredientes(ingredientes, doencas):
+    ingredientes_filtrados = []
+    for i in ingredientes:
+        nome = i["item"].lower()
+        qtd = i["quantidade"]
+        substituido = False
+        for d in doencas:
+            for proibido in PROIBIDOS[d]:
+                if proibido in nome:
+                    novo = SUBSTITUTOS.get(proibido, proibido)
+                    ingredientes_filtrados.append({"item": novo, "quantidade": qtd})
+                    substituido = True
+                    break
+            if substituido:
+                break
+        if not substituido:
+            ingredientes_filtrados.append(i)
+    return ingredientes_filtrados
+
+# Função principal que gera receita via Gemini
 def gerar_receita_gemini(titulo: str, doencas: list[str]):
     # Cria instrução de restrições com base nas doenças
     restricoes = ""
@@ -42,9 +87,9 @@ def gerar_receita_gemini(titulo: str, doencas: list[str]):
         restricoes += "Evite totalmente os seguintes ingredientes:\n"
         for d in doencas:
             restricoes += f"- {', '.join(PROIBIDOS[d])}\n"
-        restricoes += "Se algum ingrediente estiver nesta lista, substitua por uma alternativa saudável adequada.\n"
+        restricoes += "Substitua qualquer ingrediente proibido por alternativas saudáveis.\n"
 
-    # Prompt completo para a IA
+    # Prompt para Gemini
     prompt = f"""
 Crie uma receita adequada para pessoas com Alzheimer.
 {restricoes}
@@ -78,13 +123,16 @@ Título da receita: "{titulo}"
     texto = response.text.strip()
     logging.info(f"Texto bruto do Gemini: {texto}")
 
-    # Extrai JSON válido do texto retornado
+    # Extrai JSON válido
     match = re.search(r"\{.*\}", texto, re.DOTALL)
     if not match:
         raise ValueError("Não foi possível extrair JSON válido do modelo")
     
     receita = json.loads(match.group(0))
-    logging.info(f"Receita JSON extraída: {receita}")
+
+    # Filtra ingredientes proibidos
+    receita["ingredientes"] = filtrar_ingredientes(receita["ingredientes"], doencas)
+
     return receita
 
 # Endpoint que recebe título e doenças
@@ -95,7 +143,7 @@ async def gerar_receita(dados: ReceitaRequest):
         return receita
     except Exception as e:
         logging.error(f"Erro ao gerar receita: {e}")
-        # fallback simples caso a IA falhe
+        # fallback simples
         return {
             "nome": f"Receita de {dados.titulo}",
             "descricao": "Receita nutritiva para Alzheimer",
