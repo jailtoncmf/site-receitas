@@ -69,8 +69,8 @@ export default function App() {
           <ChefHat size={36} color="#4f46e5" />
         </div>
 
-        <h1>Receitas para Alzheimer</h1>
-        <p className="subtitle">Receitas simples e nutritivas para a saúde do cérebro</p>
+        <h1>Gerador de Receitas</h1>
+        <p className="subtitle">Escreva a Receita que você quer ou Ingredientes que Você tem para Receber uma Receita</p>
 
         <div className="card">
           <input
@@ -81,27 +81,18 @@ export default function App() {
             onKeyDown={(e) => e.key === "Enter" && gerarReceita()}
           />
 
-          <div style={{ marginTop: "12px" }}>
+          <p style={{ marginTop: "12px", fontWeight: "bold" }}>
+            Você possui alguma dessas doenças?
+          </p>
+          <div className="doencas">
             <label>
-              <input
-                type="checkbox"
-                checked={doencas.Diabetes}
-                onChange={() => setDoencas({ ...doencas, Diabetes: !doencas.Diabetes })}
-              /> Diabetes
+              <input type="checkbox" checked={doencas.diabetes} onChange={() => toggleDoenca("diabetes")} /> Diabetes
             </label>
             <label>
-              <input
-                type="checkbox"
-                checked={doencas.Hipertensao}
-                onChange={() => setDoencas({ ...doencas, Hipertensao: !doencas.Hipertensao })}
-              /> Hipertensão
+              <input type="checkbox" checked={doencas.hipertensao} onChange={() => toggleDoenca("hipertensao")} /> Hipertensão
             </label>
             <label>
-              <input
-                type="checkbox"
-                checked={doencas.Colesterol}
-                onChange={() => setDoencas({ ...doencas, Colesterol: !doencas.Colesterol })}
-              /> Colesterol Alto
+              <input type="checkbox" checked={doencas.colesterol} onChange={() => toggleDoenca("colesterol")} /> Colesterol Alto
             </label>
           </div>
 
