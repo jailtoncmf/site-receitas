@@ -7,12 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import google.generativeai as genai
 
+# Configura Gemini
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI()
 
+# Permite acesso do frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,33 +22,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Modelo de entrada atualizado
+# Modelo de entrada
 class ReceitaRequest(BaseModel):
     titulo: str
-    doencas: list[str] = []
+    doencas: list[str] = []  # Lista de doenças selecionadas pelo usuário
 
+# Ingredientes proibidos por doença
+PROIBIDOS = {
+    "diabetes": ["açúcar","açúcar refinado", "açúcar demerara", "açúcar mascavo", "mel", "xarope de milho", "chocolate ao leite", "refrigerante", "bolo industrializado"],
+    "hipertensao": ["sal", "salsicha", "presunto", "queijo processado", "molho pronto", "conservas"],
+    "colesterol": ["manteiga", "creme de leite", "queijo amarelo", "gordura animal", "frituras", "ovos em excesso"]
+}
+
+# Função principal que gera a receita via Gemini
 def gerar_receita_gemini(titulo: str, doencas: list[str]):
+    # Cria instrução de restrições com base nas doenças
     restricoes = ""
-    substituicoes = ""
+    if doencas:
+        restricoes += "Evite totalmente os seguintes ingredientes:\n"
+        for d in doencas:
+            restricoes += f"- {', '.join(PROIBIDOS[d])}\n"
+        restricoes += "Se algum ingrediente estiver nesta lista, substitua por uma alternativa saudável adequada.\n"
 
-    if "diabetes" in doencas:
-        restricoes += "- Não use açúcar refinado nem ingredientes que aumentem rapidamente a glicose.\n"
-        substituicoes += "- Substitua açúcar por adoçantes naturais como stevia ou eritritol.\n"
-
-    if "hipertensao" in doencas:
-        restricoes += "- Reduza sal e evite alimentos processados ricos em sódio.\n"
-        substituicoes += "- Substitua sal comum por ervas, especiarias ou sal com baixo sódio.\n"
-
-    if "colesterol" in doencas:
-        restricoes += "- Evite gorduras saturadas, frituras e ovos em excesso.\n"
-        substituicoes += "- Substitua manteiga e gorduras saturadas por azeite ou óleo vegetal.\n"
-
+    # Prompt completo para a IA
     prompt = f"""
 Crie uma receita adequada para pessoas com Alzheimer.
-
-Siga estas regras:
 {restricoes}
-{substituicoes}
 
 Responda APENAS com um JSON válido no seguinte formato:
 
@@ -70,26 +71,31 @@ Responda APENAS com um JSON válido no seguinte formato:
 
 Título da receita: "{titulo}"
 """
+
+    # Gera conteúdo usando Gemini
     model = genai.GenerativeModel("gemini-2.5-flash")
     response = model.generate_content(prompt)
     texto = response.text.strip()
+    logging.info(f"Texto bruto do Gemini: {texto}")
 
-    # Extrai JSON válido
+    # Extrai JSON válido do texto retornado
     match = re.search(r"\{.*\}", texto, re.DOTALL)
     if not match:
         raise ValueError("Não foi possível extrair JSON válido do modelo")
     
-    return json.loads(match.group(0))
+    receita = json.loads(match.group(0))
+    logging.info(f"Receita JSON extraída: {receita}")
+    return receita
 
+# Endpoint que recebe título e doenças
 @app.post("/gerar-receita")
 async def gerar_receita(dados: ReceitaRequest):
     try:
         receita = gerar_receita_gemini(dados.titulo, dados.doencas)
         return receita
     except Exception as e:
-        import logging
         logging.error(f"Erro ao gerar receita: {e}")
-        # fallback
+        # fallback simples caso a IA falhe
         return {
             "nome": f"Receita de {dados.titulo}",
             "descricao": "Receita nutritiva para Alzheimer",
@@ -102,4 +108,3 @@ async def gerar_receita(dados: ReceitaRequest):
             "modoPreparo": ["Passo 1", "Passo 2"],
             "beneficios": ["Melhora memória", "Fortalece o cérebro"]
         }
-
