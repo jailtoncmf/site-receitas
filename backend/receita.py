@@ -27,69 +27,51 @@ class ReceitaRequest(BaseModel):
     titulo: str
     doencas: list[str] = []  # Lista de doenças selecionadas pelo usuário
 
-# Ingredientes proibidos por doença
+# Ingredientes proibidos por doença e substituições
 PROIBIDOS = {
-    "diabetes": ["açúcar","açúcar refinado", "açúcar demerara", "açúcar mascavo", "mel", "xarope de milho", "chocolate ao leite", "refrigerante", "bolo industrializado"],
-    "hipertensao": ["sal", "salsicha", "presunto", "queijo processado", "molho pronto", "conservas"],
-    "colesterol": ["manteiga", "creme de leite", "queijo amarelo", "gordura animal", "frituras", "ovos em excesso"]
+    "diabetes": {
+        "açúcar": "adoçante natural (eritritol ou xilitol)",
+        "açúcar refinado": "adoçante natural (eritritol ou xilitol)",
+        "mel": "adoçante natural (eritritol ou xilitol)",
+        "chocolate ao leite": "chocolate amargo sem açúcar",
+        "refrigerante": "água ou chá sem açúcar",
+        "bolo industrializado": "bolo caseiro sem açúcar"
+    },
+    "hipertensao": {
+        "sal": "sal light ou ervas aromáticas",
+        "salsicha": "frango ou peru sem sal",
+        "presunto": "peito de peru sem sal",
+        "queijo processado": "queijo branco magro",
+        "molho pronto": "molho caseiro sem sal",
+        "conservas": "legumes frescos ou congelados"
+    },
+    "colesterol": {
+        "manteiga": "azeite de oliva",
+        "creme de leite": "iogurte natural desnatado",
+        "queijo amarelo": "queijo branco magro",
+        "gordura animal": "azeite ou óleo vegetal",
+        "frituras": "assar ou cozinhar",
+        "ovos em excesso": "use apenas 1 ou 2 ovos"
+    }
 }
 
-# Substitutos saudáveis para ingredientes proibidos
-SUBSTITUTOS = {
-    "açúcar": "adoçante natural (eritritol ou xilitol)",
-    "açúcar refinado": "adoçante natural (eritritol ou xilitol)",
-    "açúcar demerara": "adoçante natural (eritritol ou xilitol)",
-    "açúcar mascavo": "adoçante natural (eritritol ou xilitol)",
-    "mel": "adoçante natural (eritritol ou xilitol)",
-    "xarope de milho": "adoçante natural (eritritol ou xilitol)",
-    "chocolate ao leite": "chocolate 70% cacau ou cacau puro",
-    "refrigerante": "suco natural sem açúcar",
-    "bolo industrializado": "bolo caseiro com ingredientes naturais",
-    "sal": "sal light ou temperos naturais",
-    "salsicha": "frango ou peru cozido",
-    "presunto": "frango ou peru cozido",
-    "queijo processado": "queijo branco ou ricota",
-    "molho pronto": "molho caseiro sem sal",
-    "conservas": "vegetais frescos",
-    "manteiga": "azeite de oliva ou óleo vegetal",
-    "creme de leite": "iogurte natural",
-    "queijo amarelo": "queijo branco ou ricota",
-    "gordura animal": "azeite de oliva",
-    "frituras": "assado ou cozido",
-    "ovos em excesso": "1 ovo por receita ou claras"
-}
-
-# Função para substituir ingredientes proibidos
-def filtrar_ingredientes(ingredientes, doencas):
-    ingredientes_filtrados = []
-    for i in ingredientes:
-        nome = i["item"].lower()
-        qtd = i["quantidade"]
-        substituido = False
+def filtrar_ingredientes(ingredientes: list[dict], doencas: list[str]):
+    """Substitui ingredientes proibidos por alternativas saudáveis"""
+    for i, ing in enumerate(ingredientes):
+        item_lower = ing["item"].lower()
         for d in doencas:
-            for proibido in PROIBIDOS[d]:
-                if proibido in nome:
-                    novo = SUBSTITUTOS.get(proibido, proibido)
-                    ingredientes_filtrados.append({"item": novo, "quantidade": qtd})
-                    substituido = True
-                    break
-            if substituido:
-                break
-        if not substituido:
-            ingredientes_filtrados.append(i)
-    return ingredientes_filtrados
+            for proibido, substituto in PROIBIDOS[d].items():
+                if proibido in item_lower:
+                    ing["item"] = substituto
+    return ingredientes
 
-# Função principal que gera receita via Gemini
 def gerar_receita_gemini(titulo: str, doencas: list[str]):
-    # Cria instrução de restrições com base nas doenças
+    # Prompt para a IA
     restricoes = ""
     if doencas:
-        restricoes += "Evite totalmente os seguintes ingredientes:\n"
-        for d in doencas:
-            restricoes += f"- {', '.join(PROIBIDOS[d])}\n"
-        restricoes += "Substitua qualquer ingrediente proibido por alternativas saudáveis.\n"
+        restricoes += "Evite totalmente os ingredientes que podem prejudicar as doenças selecionadas.\n"
+        restricoes += "Se algum ingrediente estiver nesta lista, substitua por alternativas saudáveis.\n"
 
-    # Prompt para Gemini
     prompt = f"""
 Crie uma receita adequada para pessoas com Alzheimer.
 {restricoes}
@@ -117,25 +99,21 @@ Responda APENAS com um JSON válido no seguinte formato:
 Título da receita: "{titulo}"
 """
 
-    # Gera conteúdo usando Gemini
     model = genai.GenerativeModel("gemini-2.5-flash")
     response = model.generate_content(prompt)
     texto = response.text.strip()
     logging.info(f"Texto bruto do Gemini: {texto}")
 
-    # Extrai JSON válido
     match = re.search(r"\{.*\}", texto, re.DOTALL)
     if not match:
         raise ValueError("Não foi possível extrair JSON válido do modelo")
     
     receita = json.loads(match.group(0))
-
     # Filtra ingredientes proibidos
     receita["ingredientes"] = filtrar_ingredientes(receita["ingredientes"], doencas)
-
+    logging.info(f"Receita final filtrada: {receita}")
     return receita
 
-# Endpoint que recebe título e doenças
 @app.post("/gerar-receita")
 async def gerar_receita(dados: ReceitaRequest):
     try:
