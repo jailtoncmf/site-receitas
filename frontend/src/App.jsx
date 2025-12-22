@@ -117,7 +117,7 @@ export default function App() {
           </div>
 
           <button onClick={gerarReceita} disabled={loading}>
-            {loading ? "Gerando..." : "Gerar Receita"} <Plus size={16} />
+            {loading ? "Gerando..." : "Gerar Receita"}
           </button>
         </div>
 
