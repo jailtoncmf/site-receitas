@@ -11,9 +11,7 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 logging.basicConfig(level=logging.INFO)
 
-
 app = FastAPI()
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,14 +20,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+# Modelo de entrada atualizado
 class ReceitaRequest(BaseModel):
     titulo: str
+    doencas: list[str] = []
 
-
-def gerar_receita_gemini(titulo: str):
+# Função para gerar receita via Gemini
+def gerar_receita_gemini(titulo: str, doencas: list[str]):
+    restricoes = ", ".join(doencas) if doencas else "nenhuma"
     prompt = f"""
 Crie uma receita adequada para pessoas com Alzheimer.
+
+Evite ingredientes que pessoas com as seguintes condições não podem consumir: {restricoes}.
 
 Responda APENAS com um JSON válido no seguinte formato:
 
@@ -53,12 +55,10 @@ Responda APENAS com um JSON válido no seguinte formato:
 
 Título da receita: "{titulo}"
 """
-
     model = genai.GenerativeModel("gemini-2.5-flash")
     response = model.generate_content(prompt)
     texto = response.text.strip()
     logging.info(f"Texto bruto do Gemini: {texto}")
-
 
     match = re.search(r"\{.*\}", texto, re.DOTALL)
     if not match:
@@ -68,15 +68,14 @@ Título da receita: "{titulo}"
     logging.info(f"Receita JSON extraída: {receita}")
     return receita
 
-
 @app.post("/gerar-receita")
 async def gerar_receita(dados: ReceitaRequest):
     try:
-        receita = gerar_receita_gemini(dados.titulo)
+        receita = gerar_receita_gemini(dados.titulo, dados.doencas)
         return receita
     except Exception as e:
         logging.error(f"Erro ao gerar receita com Gemini: {e}")
-
+        # fallback
         return {
             "nome": f"Receita de {dados.titulo}",
             "descricao": "Receita nutritiva para Alzheimer",
