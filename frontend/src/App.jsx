@@ -86,7 +86,7 @@ export default function App() {
 
         <h1>Gerador de Receitas</h1>
         <p className="subtitle">
-          Escreva a Receita que você quer ou Ingredientes que Você tem para Receber uma Receita
+          Escreva a Receita que você Deseja:
         </p>
 
         <div className="card">
